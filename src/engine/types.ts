@@ -9,11 +9,28 @@ export interface LineResult {
   name?: string
   value?: number
   error?: string
+  /** Prefix `!` — show value but exclude from total */
+  excludeFromTotal?: boolean
 }
 
 export interface DocResult {
   lines: LineResult[]
-  /** Sum of all finite line values (assignment rows included) */
+  /** Sum of finite line values that are not excludeFromTotal */
   total: number
+  /** Sum including excluded lines (debug) */
+  totalAll: number
   variables: Record<string, number>
+}
+
+export interface PaperDoc {
+  id: string
+  title: string
+  content: string
+  updatedAt: number
+}
+
+export interface PaperStore {
+  version: 2
+  activeId: string
+  papers: PaperDoc[]
 }

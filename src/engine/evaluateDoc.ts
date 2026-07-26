@@ -1,4 +1,5 @@
 import { create, all, type MathNode } from 'mathjs'
+import Decimal from 'decimal.js'
 import { parseLine } from './line'
 import type { DocResult, LineResult } from './types'
 
@@ -15,19 +16,27 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** mathjs does not accept CJK identifiers — map to __v_n */
+function cleanNumber(n: number): number {
+  // prefer decimal rounding to 12 dp then number
+  try {
+    const d = new Decimal(n)
+    const r = d.toDecimalPlaces(12, Decimal.ROUND_HALF_UP).toNumber()
+    return Object.is(r, -0) ? 0 : r
+  } catch {
+    const r = Math.round(n * 1e12) / 1e12
+    return Object.is(r, -0) ? 0 : r
+  }
+}
+
 class VarTable {
   private toId = new Map<string, string>()
   private seq = 0
-  /** public names → values (original names) */
   values: Record<string, number> = {}
-  /** id → value for mathjs scope */
   scope: Record<string, number> = {}
 
   ensureId(name: string): string {
     let id = this.toId.get(name)
     if (!id) {
-      // pure ascii identifiers can stay (mathjs-friendly)
       if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
         id = name
       } else {
@@ -45,11 +54,17 @@ class VarTable {
     this.scope[id] = value
   }
 
-  /** Rewrite user expr: #n and known (and bare) identifiers */
-  rewrite(expr: string): string {
-    let s = expr.replace(/#(\d+)/g, (_, n: string) => `__line_${n}`)
+  rewrite(expr: string, prevLineNo: number | null): string {
+    let s = expr
+    // 上一行
+    if (s.includes('#__prev__')) {
+      if (prevLineNo == null) {
+        throw new Error('没有上一行可引用')
+      }
+      s = s.replace(/#__prev__/g, `__line_${prevLineNo}`)
+    }
+    s = s.replace(/#(\d+)/g, (_, n: string) => `__line_${n}`)
 
-    // longest name first
     const names = [...this.toId.keys()].sort((a, b) => b.length - a.length)
     for (const name of names) {
       const id = this.toId.get(name)!
@@ -61,7 +76,6 @@ class VarTable {
       s = s.replace(re, id)
     }
 
-    // any remaining CJK/unicode idents → ensure mapping (undefined vars will fail at eval)
     s = s.replace(IDENT_RE, (tok) => {
       if (tok.startsWith('__line_') || tok.startsWith('__v_')) return tok
       if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(tok)) return tok
@@ -72,18 +86,13 @@ class VarTable {
   }
 }
 
-function cleanNumber(n: number): number {
-  // kill binary float dust from percent etc.
-  const r = Math.round(n * 1e12) / 1e12
-  return Object.is(r, -0) ? 0 : r
-}
-
 function evalExpr(
   expr: string,
   vars: VarTable,
+  prevLineNo: number | null,
 ): { value?: number; error?: string } {
   try {
-    const rewritten = vars.rewrite(expr)
+    const rewritten = vars.rewrite(expr, prevLineNo)
     const node: MathNode = math.parse(rewritten)
     const raw = node.evaluate(vars.scope)
     const num = typeof raw === 'number' ? raw : Number(raw)
@@ -97,6 +106,13 @@ function evalExpr(
   }
 }
 
+function findPrevValueLine(lines: LineResult[], beforeIndex: number): number | null {
+  for (let j = beforeIndex - 1; j >= 0; j--) {
+    if (typeof lines[j]?.value === 'number') return j + 1 // 1-based
+  }
+  return null
+}
+
 export function evaluateDoc(text: string): DocResult {
   const rawLines = text.split('\n').slice(0, MAX_LINES)
   const vars = new VarTable()
@@ -108,7 +124,12 @@ export function evaluateDoc(text: string): DocResult {
 
     const parsed = parseLine(raw)
     const lineNo = i + 1
-    const base: LineResult = { raw, kind: parsed.kind }
+    const prevLineNo = findPrevValueLine(lines, i)
+    const base: LineResult = {
+      raw,
+      kind: parsed.kind,
+      excludeFromTotal: parsed.excludeFromTotal,
+    }
 
     if (parsed.kind === 'empty' || parsed.kind === 'comment') {
       lines.push(base)
@@ -133,6 +154,9 @@ export function evaluateDoc(text: string): DocResult {
         break
       }
     }
+    if (parsed.expr.includes('#__prev__') && prevLineNo == null) {
+      refError = '没有上一行可引用'
+    }
     if (refError) {
       lines.push({
         ...base,
@@ -145,7 +169,7 @@ export function evaluateDoc(text: string): DocResult {
     }
 
     if (parsed.kind === 'assign' && parsed.name) {
-      const { value, error } = evalExpr(parsed.expr, vars)
+      const { value, error } = evalExpr(parsed.expr, vars, prevLineNo)
       if (error != null || value === undefined) {
         lines.push({
           ...base,
@@ -168,7 +192,7 @@ export function evaluateDoc(text: string): DocResult {
       continue
     }
 
-    const { value, error } = evalExpr(parsed.expr, vars)
+    const { value, error } = evalExpr(parsed.expr, vars, prevLineNo)
     if (error != null || value === undefined) {
       lines.push({
         ...base,
@@ -188,11 +212,38 @@ export function evaluateDoc(text: string): DocResult {
   }
 
   let total = 0
+  let totalAll = 0
   for (const line of lines) {
     if (typeof line.value === 'number' && Number.isFinite(line.value)) {
-      total += line.value
+      totalAll = cleanNumber(totalAll + line.value)
+      if (!line.excludeFromTotal) {
+        total = cleanNumber(total + line.value)
+      }
     }
   }
 
-  return { lines, total, variables: { ...vars.values } }
+  return { lines, total, totalAll, variables: { ...vars.values } }
+}
+
+/** Export plain text with answers for sharing */
+export function exportWithAnswers(text: string): string {
+  const r = evaluateDoc(text)
+  const out: string[] = []
+  for (const line of r.lines) {
+    if (line.kind === 'empty') {
+      out.push('')
+      continue
+    }
+    if (typeof line.value === 'number') {
+      const mark = line.excludeFromTotal ? ' ·' : ''
+      out.push(`${line.raw}  →  ${line.value}${mark}`)
+    } else if (line.kind === 'error') {
+      out.push(`${line.raw}  →  错误: ${line.error ?? ''}`)
+    } else {
+      out.push(line.raw)
+    }
+  }
+  out.push('')
+  out.push(`总计 ${r.total}`)
+  return out.join('\n')
 }
