@@ -4,7 +4,13 @@
 
 对标 Soulver 手机「点菜记账纸」体验。
 
-## 快速开始
+## 在线预览
+
+GitHub Pages（推送 `main` 自动部署）：
+
+**https://jackwude.github.io/zhongwen-suanzhi/**
+
+本地开发：
 
 ```bash
 cd ~/.hermes/workspace/projects/zhongwen-suanzhi
