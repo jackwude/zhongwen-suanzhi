@@ -389,6 +389,21 @@ export default function App() {
                 <li>首次使用需联网获取汇率，之后缓存 24 小时</li>
               </ul>
 
+              <h3>快捷键</h3>
+              <ul>
+                <li><code>Cmd/Ctrl + F</code> → 搜索替换</li>
+                <li><code>Cmd/Ctrl + Z</code> → 撤销</li>
+                <li><code>Cmd/Ctrl + Shift + Z</code> → 重做</li>
+                <li><code>Cmd/Ctrl + /</code> → 切换注释</li>
+              </ul>
+
+              <h3>导出功能</h3>
+              <ul>
+                <li><strong>导出文本</strong> → 复制带结果的文本到剪贴板</li>
+                <li><strong>导出图片</strong> → 生成 PNG 图片（高清，2倍分辨率）</li>
+                <li>图片自动命名：标题 + 日期</li>
+              </ul>
+
               <h3>排除总计</h3>
               <ul>
                 <li><code>! 单价 = 89</code> → 不计入总计</li>
