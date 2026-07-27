@@ -30,6 +30,11 @@ export const QUOTE_SAMPLE = `// 报价试算
 // 满减演示
 商品 = 580
 商品 满300减50
+
+// 货币转换
+$100 in CNY
+€50 to ¥
+汇率 USD CNY
 `
 
 export { SAMPLE_MENU as default }

@@ -5,6 +5,7 @@ import { createPaper, loadStore, saveStore } from './storage'
 import type { PaperStore } from './engine/types'
 import { SAMPLE_MENU, QUOTE_SAMPLE } from './fixtures/sampleMenu'
 import { CalcEditor } from './editor/CalcEditor'
+import { prefetchRates } from './engine/currency'
 import html2canvas from 'html2canvas'
 import './App.css'
 
@@ -54,6 +55,11 @@ export default function App() {
       if (calcTimer.current) window.clearTimeout(calcTimer.current)
     }
   }, [text])
+
+  // Prefetch exchange rates on app startup (writes to localStorage cache)
+  useEffect(() => {
+    prefetchRates().catch(() => {})
+  }, [])
 
   // persist store
   useEffect(() => {
@@ -371,6 +377,16 @@ export default function App() {
                 <li><code>50 + 10%</code> → 55（增加10%）</li>
                 <li><code>50 * 10%</code> → 5（取10%）</li>
                 <li><code>50 - 10%</code> → 45（减少10%）</li>
+              </ul>
+
+              <h3>货币转换</h3>
+              <ul>
+                <li><code>$100 in CNY</code> → 723.45（美元转人民币）</li>
+                <li><code>€50 to ¥</code> → 398.21（欧元转人民币）</li>
+                <li><code>100 USD to CNY</code> → 723.45</li>
+                <li><code>汇率 USD CNY</code> → 7.2345（查询汇率）</li>
+                <li>支持：USD, CNY, EUR, GBP, JPY, HKD 等</li>
+                <li>首次使用需联网获取汇率，之后缓存 24 小时</li>
               </ul>
 
               <h3>排除总计</h3>
