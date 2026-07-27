@@ -13,6 +13,10 @@ export interface LineResult {
   excludeFromTotal?: boolean
   /** Result is a date (display as YYYY-MM-DD) */
   isDate?: boolean
+  /** Result is a currency conversion */
+  isCurrency?: boolean
+  /** Currency code for display (e.g., 'CNY', 'USD') */
+  currencyCode?: string
 }
 
 export interface DocResult {

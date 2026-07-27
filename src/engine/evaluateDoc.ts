@@ -3,6 +3,8 @@ import Decimal from 'decimal.js'
 import { parseLine } from './line'
 import type { DocResult, LineResult } from './types'
 import { looksLikeDateExpr, isDateDiffExpr } from './datetime'
+import { parseCurrencyExpr, convertCurrencySync, getRateSync } from './currency'
+import { stripExcludePrefix } from './line'
 
 const math = create(all, {
   number: 'number',
@@ -135,6 +137,39 @@ export function evaluateDoc(text: string): DocResult {
     if (parsed.kind === 'empty' || parsed.kind === 'comment') {
       lines.push(base)
       continue
+    }
+
+    // Check for currency expression before normal parsing
+    const { text: rawWithoutBang } = stripExcludePrefix(raw)
+    const currencyParsed = parseCurrencyExpr(rawWithoutBang)
+    if (currencyParsed) {
+      let value: number | null = null
+      if (currencyParsed.type === 'convert' && currencyParsed.amount && currencyParsed.from && currencyParsed.to) {
+        value = convertCurrencySync(currencyParsed.amount, currencyParsed.from, currencyParsed.to)
+      } else if (currencyParsed.type === 'rate' && currencyParsed.from && currencyParsed.to) {
+        value = getRateSync(currencyParsed.from, currencyParsed.to)
+      }
+
+      if (value !== null) {
+        lines.push({
+          ...base,
+          kind: 'expr',
+          expr: raw,
+          value: cleanNumber(value),
+          isCurrency: true,
+          currencyCode: currencyParsed.to,
+        })
+        vars.scope[`__line_${lineNo}`] = value
+        continue
+      } else {
+        lines.push({
+          ...base,
+          kind: 'error',
+          expr: raw,
+          error: '汇率未缓存，请稍后刷新',
+        })
+        continue
+      }
     }
 
     if (!parsed.expr) {

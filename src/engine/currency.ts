@@ -202,6 +202,45 @@ export async function getRate(from: string, to: string): Promise<number | null> 
 }
 
 /**
+ * 同步读取缓存的汇率（供 evaluateDoc 同步使用）
+ */
+export function getRatesSync(base: string = 'USD'): ExchangeRates | null {
+  const cached = loadCachedRates()
+  return cached && cached.base === base ? cached : null
+}
+
+/**
+ * 同步货币转换（使用 localStorage 缓存）
+ */
+export function convertCurrencySync(
+  amount: number,
+  from: string,
+  to: string,
+): number | null {
+  if (from === to) return amount
+  const rates = getRatesSync(from)
+  if (!rates || typeof rates.rates[to] !== 'number') return null
+  return amount * rates.rates[to]
+}
+
+/**
+ * 同步获取汇率
+ */
+export function getRateSync(from: string, to: string): number | null {
+  if (from === to) return 1
+  const rates = getRatesSync(from)
+  if (!rates || typeof rates.rates[to] !== 'number') return null
+  return rates.rates[to]
+}
+
+/**
+ * 预取汇率（应用启动时调用，写入 localStorage）
+ */
+export async function prefetchRates(): Promise<void> {
+  await getExchangeRates('USD')
+}
+
+/**
  * 格式化货币显示
  */
 export function formatCurrency(amount: number, currency: string): string {
