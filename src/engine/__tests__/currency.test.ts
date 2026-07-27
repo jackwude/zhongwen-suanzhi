@@ -60,14 +60,14 @@ describe('currency sync functions', () => {
     })
   })
 
-  it('convertCurrencySync returns null when no cache', () => {
+  it('convertCurrencySync uses default rates when no cache', () => {
     const result = convertCurrencySync(100, 'USD', 'CNY')
-    expect(result).toBeNull()
+    expect(result).toBe(720) // 默认汇率 7.2
   })
 
-  it('getRateSync returns null when no cache', () => {
+  it('getRateSync uses default rates when no cache', () => {
     const result = getRateSync('USD', 'CNY')
-    expect(result).toBeNull()
+    expect(result).toBe(7.2) // 默认汇率
   })
 
   it('convertCurrencySync uses cached rates', () => {
@@ -121,10 +121,10 @@ describe('evaluateDoc with currency', () => {
     expect(result.lines[0]?.currencyCode).toBe('CNY')
   })
 
-  it('shows error when no cache', () => {
+  it('converts with default rates when no cache', () => {
     const result = evaluateDoc('$100 in CNY')
-    expect(result.lines[0]?.kind).toBe('error')
-    expect(result.lines[0]?.error).toContain('汇率未缓存')
+    expect(result.lines[0]?.kind).toBe('expr')
+    expect(result.lines[0]?.value).toBe(720) // 100 * 7.2
   })
 
   it('evaluates rate query', () => {

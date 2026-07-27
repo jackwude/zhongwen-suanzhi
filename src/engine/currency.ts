@@ -202,11 +202,36 @@ export async function getRate(from: string, to: string): Promise<number | null> 
 }
 
 /**
+ * 默认汇率（fallback，当 API 请求失败或 localStorage 无缓存时使用）
+ * 基于 2024 年初的近似汇率
+ */
+const DEFAULT_RATES: Record<string, Record<string, number>> = {
+  USD: { CNY: 7.2, EUR: 0.92, GBP: 0.79, JPY: 148, HKD: 7.8, TWD: 31.5, KRW: 1320, AUD: 1.52, CAD: 1.35, CHF: 0.87, SGD: 1.34, THB: 35.5, VND: 24500, MYR: 4.7, INR: 83 },
+  CNY: { USD: 0.14, EUR: 0.13, GBP: 0.11, JPY: 20.5, HKD: 1.08, TWD: 4.4, KRW: 183, AUD: 0.21, CAD: 0.19, CHF: 0.12, SGD: 0.19, THB: 4.9, VND: 3400, MYR: 0.65, INR: 11.5 },
+  EUR: { USD: 1.09, CNY: 7.85, GBP: 0.86, JPY: 161, HKD: 8.5, TWD: 34, KRW: 1440, AUD: 1.65, CAD: 1.47, CHF: 0.95, SGD: 1.46, THB: 38.5, VND: 26700, MYR: 5.1, INR: 91 },
+  GBP: { USD: 1.27, CNY: 9.15, EUR: 1.16, JPY: 188, HKD: 9.9, TWD: 39.5, KRW: 1675, AUD: 1.92, CAD: 1.71, CHF: 1.1, SGD: 1.7, THB: 45, VND: 31000, MYR: 5.95, INR: 106 },
+  JPY: { USD: 0.0068, CNY: 0.049, EUR: 0.0062, GBP: 0.0053, HKD: 0.053, TWD: 0.21, KRW: 8.9, AUD: 0.01, CAD: 0.0091, CHF: 0.0059, SGD: 0.009, THB: 0.24, VND: 166, MYR: 0.032, INR: 0.56 },
+}
+
+/**
  * 同步读取缓存的汇率（供 evaluateDoc 同步使用）
  */
 export function getRatesSync(base: string = 'USD'): ExchangeRates | null {
   const cached = loadCachedRates()
-  return cached && cached.base === base ? cached : null
+  if (cached && cached.base === base) {
+    return cached
+  }
+  
+  // Fallback to default rates
+  if (DEFAULT_RATES[base]) {
+    return {
+      base,
+      rates: DEFAULT_RATES[base],
+      lastUpdate: 0, // Mark as default rates
+    }
+  }
+  
+  return null
 }
 
 /**
