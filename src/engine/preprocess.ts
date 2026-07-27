@@ -1,3 +1,5 @@
+import { preprocessDate } from './datetime'
+
 /**
  * Chinese / natural-language normalization → standard expression fragments.
  * Pure string transforms; no mathjs.
@@ -125,6 +127,10 @@ export function preprocess(input: string): string {
     s = s.slice(0, commentIdx).trim()
   }
   if (!s) return s
+
+  // 日期预处理（今天、明天、2026-08-01 等）
+  const dateResult = preprocessDate(s)
+  s = dateResult.text
 
   s = stripThousands(s)
   s = replacePrevLine(s)

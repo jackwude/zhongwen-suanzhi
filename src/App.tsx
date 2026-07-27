@@ -5,6 +5,7 @@ import { createPaper, loadStore, saveStore } from './storage'
 import type { PaperStore } from './engine/types'
 import { SAMPLE_MENU, QUOTE_SAMPLE } from './fixtures/sampleMenu'
 import { CalcEditor } from './editor/CalcEditor'
+import html2canvas from 'html2canvas'
 import './App.css'
 
 const DEBOUNCE_MS = 100
@@ -17,6 +18,7 @@ export default function App() {
   const [title, setTitle] = useState(active.title)
   const [liveText, setLiveText] = useState(active.content)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const saveTimer = useRef<number | null>(null)
   const calcTimer = useRef<number | null>(null)
@@ -156,6 +158,32 @@ export default function App() {
     }
   }
 
+  const exportImage = useCallback(async () => {
+    const sheet = document.querySelector('.sheet') as HTMLElement
+    if (!sheet) return
+    
+    try {
+      const canvas = await html2canvas(sheet, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+      })
+      
+      canvas.toBlob((blob) => {
+        if (!blob) return
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${title || '算纸'}-${new Date().toISOString().slice(0, 10)}.png`
+        a.click()
+        URL.revokeObjectURL(url)
+      }, 'image/png')
+    } catch (err) {
+      console.error('导出图片失败:', err)
+      alert('导出图片失败，请重试')
+    }
+  }, [title])
+
   return (
     <div className={`app ${sidebarOpen ? 'with-side' : ''}`}>
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
@@ -223,8 +251,14 @@ export default function App() {
             <button type="button" className="btn ghost" onClick={() => loadSample('quote')}>
               报价
             </button>
-            <button type="button" className="btn ghost" onClick={copyExport}>
-              导出
+            <button type="button" className="btn ghost" onClick={copyExport} title="复制文本">
+              导出文本
+            </button>
+            <button type="button" className="btn ghost" onClick={exportImage} title="导出为图片">
+              导出图片
+            </button>
+            <button type="button" className="btn ghost" onClick={() => setHelpOpen(true)} title="帮助">
+              ?
             </button>
             <button type="button" className="btn ghost" onClick={clearAll}>
               清空
@@ -258,7 +292,7 @@ export default function App() {
                         : undefined
                   }
                 >
-                  {isErr ? '—' : hasVal ? formatNumber(line!.value!) : ''}
+                  {isErr ? '—' : hasVal ? formatNumber(line!.value!, line!.isDate) : ''}
                   {excl && hasVal ? <span className="excl-dot">·</span> : null}
                 </div>
               )
@@ -279,6 +313,75 @@ export default function App() {
           </div>
         </footer>
       </div>
+
+      {helpOpen && (
+        <div className="modal-overlay" onClick={() => setHelpOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>数学函数帮助</h2>
+              <button type="button" className="btn ghost" onClick={() => setHelpOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <h3>基础运算</h3>
+              <ul>
+                <li><code>sqrt(16)</code> → 4（平方根）</li>
+                <li><code>abs(-5)</code> → 5（绝对值）</li>
+                <li><code>log(100)</code> → 2（对数）</li>
+                <li><code>pow(2, 3)</code> → 8（幂运算）</li>
+              </ul>
+
+              <h3>三角函数</h3>
+              <ul>
+                <li><code>sin(30)</code> → 0.5（正弦）</li>
+                <li><code>cos(60)</code> → 0.5（余弦）</li>
+                <li><code>tan(45)</code> → 1（正切）</li>
+              </ul>
+
+              <h3>日期计算</h3>
+              <ul>
+                <li><code>今天</code> → 2026-07-27</li>
+                <li><code>明天</code> → 2026-07-28</li>
+                <li><code>今天 + 30天</code> → 2026-08-26</li>
+                <li><code>2026-08-01 - 今天</code> → 5（天数差）</li>
+                <li><code>下周五</code> → 2026-07-31</li>
+              </ul>
+
+              <h3>中文语法</h3>
+              <ul>
+                <li><code>100 打八折</code> → 80</li>
+                <li><code>500 满300减50</code> → 450</li>
+                <li><code>3斤</code> → 1500（克）</li>
+                <li><code>2亩</code> → 1333.34（平方米）</li>
+                <li><code>100公里</code> → 100000（米）</li>
+              </ul>
+
+              <h3>变量与引用</h3>
+              <ul>
+                <li><code>单价 = 89</code> → 赋值</li>
+                <li><code>数量 = 3</code> → 赋值</li>
+                <li><code>总价 = 单价 * 数量</code> → 267</li>
+                <li><code>#1 + #2</code> → 引用第1、2行结果</li>
+                <li><code>上一行 * 1.1</code> → 引用上一行</li>
+              </ul>
+
+              <h3>百分比</h3>
+              <ul>
+                <li><code>50 + 10%</code> → 55（增加10%）</li>
+                <li><code>50 * 10%</code> → 5（取10%）</li>
+                <li><code>50 - 10%</code> → 45（减少10%）</li>
+              </ul>
+
+              <h3>排除总计</h3>
+              <ul>
+                <li><code>! 单价 = 89</code> → 不计入总计</li>
+                <li>行首加 <code>!</code> 可排除该行</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

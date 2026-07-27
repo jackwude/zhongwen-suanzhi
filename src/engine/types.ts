@@ -11,6 +11,8 @@ export interface LineResult {
   error?: string
   /** Prefix `!` — show value but exclude from total */
   excludeFromTotal?: boolean
+  /** Result is a date (display as YYYY-MM-DD) */
+  isDate?: boolean
 }
 
 export interface DocResult {

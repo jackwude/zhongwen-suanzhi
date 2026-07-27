@@ -12,6 +12,7 @@ import {
   type DecorationSet,
 } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { search, searchKeymap } from '@codemirror/search'
 
 const numberMark = Decoration.mark({ class: 'cm-suanzhi-number' })
 const bangMark = Decoration.mark({ class: 'cm-suanzhi-bang' })
@@ -128,7 +129,8 @@ export function CalcEditor({ value, onChange, onScrollTop }: CalcEditorProps) {
         highlightActiveLine(),
         highlightActiveLineGutter(),
         history(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        search(),
+        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         highlightPlugin,
         theme,
         EditorView.lineWrapping,

@@ -2,6 +2,7 @@ import { create, all, type MathNode } from 'mathjs'
 import Decimal from 'decimal.js'
 import { parseLine } from './line'
 import type { DocResult, LineResult } from './types'
+import { looksLikeDateExpr, isDateDiffExpr } from './datetime'
 
 const math = create(all, {
   number: 'number',
@@ -203,11 +204,13 @@ export function evaluateDoc(text: string): DocResult {
       continue
     }
     vars.scope[`__line_${lineNo}`] = value
+    const isDateResult = looksLikeDateExpr(raw) && !isDateDiffExpr(raw) && value >= 0 && value <= 36500
     lines.push({
       ...base,
       kind: parsed.kind === 'mixed' ? 'mixed' : 'expr',
       expr: parsed.expr,
       value,
+      isDate: isDateResult || undefined,
     })
   }
 
