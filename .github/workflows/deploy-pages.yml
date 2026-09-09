@@ -52,3 +52,25 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Verify deployment (real check)
+        run: |
+          echo "🔍 Verifying live deployment..."
+          echo "Expected commit: ${{ github.sha }}"
+          UA="Mozilla/5.0 (compatible; CI)"
+          BASE="https://jackwude.github.io/zhongwen-suanzhi"
+          # 1. 主页返回 200
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -A "$UA" "$BASE/")
+          echo "Home page HTTP: $HTTP_CODE"
+          test "$HTTP_CODE" = "200" || { echo "❌ Home page not 200"; exit 1; }
+          # 2. 核心 JS 可加载（Vite 产物 index-*.js）
+          MAIN_JS=$(curl -s -A "$UA" "$BASE/" | grep -oE 'assets/index-[^"]+\.js' | head -1)
+          echo "Main JS: $MAIN_JS"
+          if [ -n "$MAIN_JS" ]; then
+            JS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -A "$UA" "$BASE/$MAIN_JS")
+            echo "Main JS HTTP: $JS_CODE"
+            test "$JS_CODE" = "200" || { echo "❌ Main JS not 200"; exit 1; }
+          else
+            echo "⚠️ 未找到主 JS（可能是内联），跳过 JS 检查"
+          fi
+          echo "✅ Live deployment verified: $BASE"
