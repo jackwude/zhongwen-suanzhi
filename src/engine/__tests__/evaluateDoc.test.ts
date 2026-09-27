@@ -53,6 +53,13 @@ describe('evaluateDoc core', () => {
     expect(evaluateDoc('100 打八折').lines[0]!.value).toBe(80)
   })
 
+  it('中文多位折扣：九五折 → 0.95 系数', () => {
+    expect(evaluateDoc('100 打九五折').lines[0]!.value).toBe(95)
+    expect(evaluateDoc('200 打八八折').lines[0]!.value).toBe(176)
+    expect(evaluateDoc('100 打九点五折').lines[0]!.value).toBe(95)
+    expect(evaluateDoc('100 打十折').lines[0]!.value).toBe(100)
+  })
+
   it('50 + 10% → 55', () => {
     expect(evaluateDoc('50 + 10%').lines[0]!.value).toBe(55)
   })

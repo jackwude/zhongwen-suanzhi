@@ -14,6 +14,19 @@ describe('preprocess', () => {
     expect(preprocess('8.5折').replace(/\s/g, '')).toBe('*(8.5/10)')
   })
 
+  it('中文多位数字折扣（九五折=9.5折）', () => {
+    // 中文折扣读法：首位为整数位，其余为小数位
+    expect(preprocess('打九五折').replace(/\s/g, '')).toBe('*(9.5/10)')
+    expect(preprocess('打八八折').replace(/\s/g, '')).toBe('*(8.8/10)')
+    expect(preprocess('九五折').replace(/\s/g, '')).toBe('*(9.5/10)')
+    expect(preprocess('95折').replace(/\s/g, '')).toBe('*(9.5/10)')
+    expect(preprocess('打九点五折').replace(/\s/g, '')).toBe('*(9.5/10)')
+    expect(preprocess('打八点五折').replace(/\s/g, '')).toBe('*(8.5/10)')
+    expect(preprocess('十折').replace(/\s/g, '')).toBe('*1')
+    expect(preprocess('打十折').replace(/\s/g, '')).toBe('*1')
+    expect(preprocess('100 打九五折').replace(/\s/g, '')).toBe('100*(9.5/10)')
+  })
+
   it('100 打八折', () => {
     expect(preprocess('100 打八折').replace(/\s/g, '')).toBe('100*(8/10)')
   })
