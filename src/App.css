@@ -111,6 +111,16 @@ body {
   border-top: 1px solid var(--line);
 }
 
+.side-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.side-row .btn {
+  flex: 1;
+}
+
 .side-tip {
   font-size: 11px;
   color: #8e8e93;

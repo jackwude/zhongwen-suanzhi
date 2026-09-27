@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { evaluateDoc, exportWithAnswers } from './engine/evaluateDoc'
 import { formatNumber, formatTotal } from './engine/format'
-import { createPaper, loadStore, saveStore } from './storage'
+import { createPaper, loadStore, saveStore, serializeStore, parseBackup } from './storage'
 import type { PaperStore } from './engine/types'
 import { SAMPLE_MENU, QUOTE_SAMPLE } from './fixtures/sampleMenu'
 import { CalcEditor } from './editor/CalcEditor'
 import { prefetchRates } from './engine/currency'
-import html2canvas from 'html2canvas'
 import './App.css'
 
 const DEBOUNCE_MS = 100
@@ -24,6 +23,7 @@ export default function App() {
   const saveTimer = useRef<number | null>(null)
   const calcTimer = useRef<number | null>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const skipPersist = useRef(false)
 
   // switch paper
@@ -153,6 +153,56 @@ export default function App() {
     else setTitle('报价示例')
   }
 
+  /** 导出全部算纸为 JSON 备份文件（先落盘当前编辑） */
+  const backupJSON = useCallback(() => {
+    const flushed: PaperStore = {
+      ...store,
+      papers: store.papers.map((p) =>
+        p.id === store.activeId
+          ? { ...p, content: text, title, updatedAt: Date.now() }
+          : p,
+      ),
+    }
+    const blob = new Blob([serializeStore(flushed)], {
+      type: 'application/json;charset=utf-8',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `中文算纸备份-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    showToast('已导出备份文件')
+  }, [store, text, title])
+
+  /** 从 JSON 备份文件导入，合并到现有列表 */
+  const onImportFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0]
+      e.target.value = ''
+      if (!f) return
+      const raw = await f.text()
+      const papers = parseBackup(raw)
+      if (!papers) {
+        showToast('备份文件无效，未导入')
+        return
+      }
+      if (!window.confirm(`导入 ${papers.length} 张算纸？将合并到现有列表`)) return
+      setStore((prev) => {
+        const flushed = prev.papers.map((p) =>
+          p.id === prev.activeId
+            ? { ...p, content: text, title, updatedAt: Date.now() }
+            : p,
+        )
+        const next = { ...prev, papers: [...papers, ...flushed] }
+        saveStore(next)
+        return next
+      })
+      showToast(`已导入 ${papers.length} 张算纸`)
+    },
+    [text, title],
+  )
+
   const copyExport = async () => {
     const body = exportWithAnswers(text)
     try {
@@ -167,8 +217,11 @@ export default function App() {
   const exportImage = useCallback(async () => {
     const sheet = document.querySelector('.sheet') as HTMLElement
     if (!sheet) return
-    
+
     try {
+      showToast('正在生成图片…')
+      // 懒加载：html2canvas 只在点击导出时才进包
+      const { default: html2canvas } = await import('html2canvas')
       const canvas = await html2canvas(sheet, {
         backgroundColor: '#ffffff',
         scale: 2,
@@ -224,6 +277,26 @@ export default function App() {
             ))}
         </ul>
         <div className="side-foot">
+          <div className="side-row">
+            <button type="button" className="btn ghost sm" onClick={backupJSON} title="导出全部算纸为 JSON">
+              备份
+            </button>
+            <button
+              type="button"
+              className="btn ghost sm"
+              onClick={() => importInputRef.current?.click()}
+              title="从 JSON 备份导入"
+            >
+              导入
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json,application/json"
+              style={{ display: 'none' }}
+              onChange={onImportFile}
+            />
+          </div>
           <div className="side-tip">
             行首 <code>!</code> 不计入总计
             <br />
@@ -357,6 +430,9 @@ export default function App() {
               <h3>中文语法</h3>
               <ul>
                 <li><code>100 打八折</code> → 80</li>
+                <li><code>100 打九五折</code> → 95（多位：首位为整数位）</li>
+                <li><code>100 打九点五折</code> → 95</li>
+                <li><code>100 打十折</code> → 100（原价）</li>
                 <li><code>500 满300减50</code> → 450</li>
                 <li><code>3斤</code> → 1500（克）</li>
                 <li><code>2亩</code> → 1333.34（平方米）</li>
@@ -402,6 +478,8 @@ export default function App() {
                 <li><strong>导出文本</strong> → 复制带结果的文本到剪贴板</li>
                 <li><strong>导出图片</strong> → 生成 PNG 图片（高清，2倍分辨率）</li>
                 <li>图片自动命名：标题 + 日期</li>
+                <li><strong>备份</strong>（侧边栏底部）→ 导出全部算纸为 JSON 文件</li>
+                <li><strong>导入</strong>（侧边栏底部）→ 从 JSON 备份合并算纸</li>
               </ul>
 
               <h3>排除总计</h3>

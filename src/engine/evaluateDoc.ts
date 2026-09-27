@@ -1,4 +1,4 @@
-import { create, all, type MathNode } from 'mathjs'
+import { create, all, type MathNode } from 'mathjs/number'
 import Decimal from 'decimal.js'
 import { parseLine } from './line'
 import type { DocResult, LineResult } from './types'

@@ -19,19 +19,45 @@ const CN_DIGIT: Record<string, string> = {
   九: '9',
 }
 
-function cnDigitToArabic(s: string): string {
-  return s.replace(/[零一二两三四五六七八九]/g, (ch) => CN_DIGIT[ch] ?? ch)
+const CN_DISCOUNT_DIGIT: Record<string, string> = {
+  ...CN_DIGIT,
+  点: '.',
+  十: '10',
 }
 
-/** N折 / 打N折 → *(N/10)；支持打八折 */
+/**
+ * 折扣数字 → 阿拉伯数字串（折数本身，非系数）
+ * 中文折扣读法：首位为整数位，其余为小数位 → 九五折=9.5折，八八折=8.8折
+ * 九点五折 → 9.5；十折 → 10（原价）
+ */
+function cnDiscountToArabic(token: string): string | null {
+  if (token.includes('十') && token !== '十') return null // 二十折等极罕见写法不处理
+  const s = token.replace(
+    /[零一二两三四五六七八九点十]/g,
+    (ch) => CN_DISCOUNT_DIGIT[ch] ?? ch,
+  )
+  if (!/^\d+(?:\.\d+)?$/.test(s)) return null
+  if (s === '10') return '10' // 十折 = 原价，不走首位小数规则
+  if (/^\d{2,}$/.test(s)) return `${s[0]}.${s.slice(1)}` // 95→9.5
+  return s
+}
+
+/** N折 / 打N折 → *(N/10)；支持打八折 / 打九五折 / 打九点五折 / 十折 */
 function replaceDiscount(input: string): string {
+  const num = String.raw`(?:[零一二两三四五六七八九点十]+|\d+(?:\.\d+)?)`
   let s = input
-  s = s.replace(/打\s*([零一二两三四五六七八九]+|\d+(?:\.\d+)?)\s*折/g, (_, n: string) => {
-    return `*( ${cnDigitToArabic(n)} / 10 )`
+  s = s.replace(new RegExp(String.raw`打\s*(${num})\s*折`, 'g'), (_, n: string) => {
+    const coef = cnDiscountToArabic(n)
+    if (coef == null) return _
+    return coef === '10' ? '*1' : `*( ${coef} / 10 )`
   })
   s = s.replace(
-    /(?<![.\d\u4e00-\u9fff])([零一二两三四五六七八九]+|\d+(?:\.\d+)?)\s*折/g,
-    (_, n: string) => `*( ${cnDigitToArabic(n)} / 10 )`,
+    new RegExp(String.raw`(?<![.\d\u4e00-\u9fff])(${num})\s*折`, 'g'),
+    (m, n: string) => {
+      const coef = cnDiscountToArabic(n)
+      if (coef == null) return m
+      return coef === '10' ? '*1' : `*( ${coef} / 10 )`
+    },
   )
   return s
 }
